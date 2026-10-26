@@ -33,10 +33,10 @@ Base: `https://api.imf.org/external/sdmx/3.0`.
 - FX: `/data/dataflow/IMF.STA/ER/+/{ISO3}.XDC_USD.PA_RT.M`
 - Parameters: `startPeriod=1976-01`, `endPeriod=YYYY-MM`.
 - Accept: `application/vnd.sdmx.data+csv;version=2.0.0`.
-- Country metadata: `/structure/dataflow/IMF.STA/CPI/+?references=all`, using the REF_AREA codelist. If metadata fails, the app labels its ISO-country fallback explicitly.
+- Country metadata: `/structure/dataflow/IMF.STA/CPI?references=all`, using the CL_COUNTRY codelist in the JSON response. If metadata fails, the app labels its ISO-country fallback explicitly.
 - Euro area: `G163`. Coverage varies; no artificial historical euro series is constructed.
 
-Live API availability and response formats must be checked after deployment. Errors are displayed rather than replaced with another source or simulated values. The app retries transient HTTP failures, caches downloads for six hours, and provides a refresh button. Currency redenominations and changes in monetary arrangements may limit comparisons across long samples. Series-specific UNIT_MULT values, if present, scale observation levels.
+Live API availability and response formats must be checked after deployment. Errors are displayed rather than replaced with another source or simulated values. The app retries transient HTTP failures, caches downloads for six hours, and provides a refresh button. Currency redenominations and changes in monetary arrangements may limit comparisons across long samples. SCALE values (or UNIT_MULT, if supplied) scale observation levels. SDMX monthly dates such as 2024-M01 are converted to month timestamps.
 
 ## Required checks after deployment
 
@@ -51,7 +51,15 @@ Live API availability and response formats must be checked after deployment. Err
 
 ## Validation status
 
-Syntax and arithmetic checks can run independently of IMF. Live IMF downloads, dependency installation, chart interaction, and Streamlit deployment have **not** been verified in the restricted authoring environment. Do not treat this README as proof that those checks passed. No genuine IMF exported CSV or live URLs are included until deployment and download succeed.
+Tested October 26, 2026 with live IMF data and the deployed Python 3.12 app:
+
+- UK as Country 1 and U.S. as Country 2: nominal units are USD per GBP.
+- January 2000–October 2026 CSV: 322 rows, 320 valid RER months, mean real index 100.0. Every valid exported S, RER and real index matches an independent calculation.
+- February 2000–September 2026 CSV: 320 rows, 319 valid RER months, mean real index 100.0. The reference RER changes when sample dates change.
+- Real, Nominal and Both controls work. Both uses separate axes; Nominal is in actual currency units.
+- The JSON IMF country metadata loads successfully.
+
+Example from January 2000: CPI1 = 72.6, CPI2 = 77.41148469082412, FX1 = 0.60922 GBP per USD, FX2 = 1. S = 1.6414431568234793 USD per GBP and RER = 1.539419811689907.
 
 ## Optional local run
 

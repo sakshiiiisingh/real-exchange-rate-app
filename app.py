@@ -173,9 +173,9 @@ def main():
         st.warning('No overlapping CPI and FX observations in this period. Try another period or country pair.')
     else:
         a, b, c = st.columns(3)
-        a.metric('Reference RER', f'{data.rer_reference_mean.iloc[0]:.6g}')
-        b.metric('Mean real index', f'{data.real_index.mean():.8f}')
-        c.metric('Valid months', count)
+        a.write(f'Reference RER: **{data.rer_reference_mean.iloc[0]:.6g}**')
+        b.write(f'Mean real index: **{data.real_index.mean():.8f}**')
+        c.write(f'Valid months: **{count}**')
     st.plotly_chart(chart(data, mode, units), use_container_width=True)
     export = data.copy()
     export.insert(0, 'country2', two)
