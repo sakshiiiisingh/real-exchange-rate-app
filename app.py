@@ -30,28 +30,19 @@ def local(tag):
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def countries():
-    """Read the REF_AREA codelist referenced by the IMF CPI structure."""
+    """Use IMF's JSON country codelist; XML 2.1 is not supported here."""
     response = get(f'{BASE}/structure/dataflow/IMF.STA/CPI',
-                   'application/vnd.sdmx.structure+xml;version=2.1',
+                   'application/json',
                    {'references': 'all'})
-    root = ET.fromstring(response.content)
-    refs = set()
-    for dim in root.iter():
-        if local(dim.tag) == 'Dimension' and dim.get('id') in ('REF_AREA', 'COUNTRY'):
-            for ref in dim.iter():
-                if local(ref.tag) == 'Ref' and ref.get('class') == 'Codelist':
-                    refs.add(ref.get('id'))
+    payload = response.json()['data']
     result = {}
-    for cl in root.iter():
-        if local(cl.tag) != 'Codelist' or cl.get('id') not in refs:
+    for codelist in payload.get('codelists', []):
+        if codelist.get('id') != 'CL_COUNTRY':
             continue
-        for code in cl:
-            iso = code.get('id', '')
-            if not (pycountry.countries.get(alpha_3=iso) or iso == 'G163'):
-                continue
-            names = [n.text for n in code if local(n.tag) == 'Name'
-                     and n.get('{http://www.w3.org/XML/1998/namespace}lang', 'en') == 'en']
-            result[iso] = names[0] if names else iso
+        for code in codelist.get('codes', []):
+            iso = code['id']
+            if pycountry.countries.get(alpha_3=iso) or iso == 'G163':
+                result[iso] = code.get('names', {}).get('en', code.get('name', iso))
     if not result:
         raise ValueError('IMF country metadata could not be read.')
     result['G163'] = 'Euro area'
@@ -71,8 +62,9 @@ def parse_csv(text):
     frame['month'] = pd.to_datetime(frame.TIME_PERIOD, format='%Y-%m')
     frame['value'] = pd.to_numeric(frame.OBS_VALUE, errors='coerce')
     # A series-specific multiplier, if supplied, scales the observation level.
-    if 'UNIT_MULT' in frame:
-        multiplier = pd.to_numeric(frame.UNIT_MULT, errors='coerce').fillna(0)
+    scale_column = 'SCALE' if 'SCALE' in frame else 'UNIT_MULT'
+    if scale_column in frame:
+        multiplier = pd.to_numeric(frame[scale_column], errors='coerce').fillna(0)
         frame['value'] *= 10.0 ** multiplier
     if frame.month.duplicated().any():
         raise ValueError('IMF returned multiple observations per month; inspect the series key.')
@@ -87,7 +79,9 @@ def fetch(iso, kind):
                    {'startPeriod': START, 'endPeriod': pd.Timestamp.today().strftime('%Y-%m')})
     if response.status_code == 204 or not response.text.strip():
         return pd.Series(dtype=float, name=kind)
-    return parse_csv(response.text)
+    # IMF may return the full history even when legacy date parameters are supplied.
+    series = parse_csv(response.text)
+    return series.loc[START:pd.Timestamp.today().strftime('%Y-%m')]
 
 
 def calculate(inputs):
