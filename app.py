@@ -1,5 +1,7 @@
 """Monthly bilateral real exchange rates using IMF SDMX 3.0."""
 from io import StringIO
+import base64
+from html import escape
 import xml.etree.ElementTree as ET
 import pandas as pd
 import plotly.graph_objects as go
@@ -104,25 +106,130 @@ def chart(data, mode, units):
     fig = make_subplots(specs=[[{'secondary_y': True}]])
     if mode in ('Real', 'Both'):
         fig.add_trace(go.Scatter(x=data.index, y=data.real_index, name='Real index',
-                      connectgaps=False, line={'color': '#175CD3'}), secondary_y=False)
+                      connectgaps=False, line={'color': '#196f61', 'width': 2.8}), secondary_y=False)
         fig.add_hline(y=100, line_dash='dot', line_color='#98A2B3')
     if mode in ('Nominal', 'Both'):
         fig.add_trace(go.Scatter(x=data.index, y=data.nominal_s, name=f'Nominal S ({units})',
-                      connectgaps=False, line={'color': '#D56A21'}), secondary_y=(mode == 'Both'))
+                      connectgaps=False, line={'color': '#c28453', 'width': 2.4}), secondary_y=(mode == 'Both'))
     fig.update_yaxes(title_text='Real index (sample mean = 100)' if mode != 'Nominal'
                      else units, secondary_y=False)
     if mode == 'Both':
         fig.update_yaxes(title_text=units, secondary_y=True)
-    fig.update_layout(template='plotly_white', hovermode='x unified', height=480,
-                      legend={'orientation': 'h', 'y': 1.12}, margin={'t': 55})
+    fig.update_layout(template='plotly_white', hovermode='x unified', height=470,
+                      paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                      font={'family': 'Arial, sans-serif', 'color': '#4d6665', 'size': 12},
+                      legend={'orientation': 'h', 'y': 1.16, 'font': {'size': 12}},
+                      margin={'t': 65, 'b': 45, 'l': 58, 'r': 58})
+    fig.update_xaxes(showgrid=False, zeroline=False)
+    fig.update_yaxes(gridcolor='#e6ece7', zeroline=False)
+    fig.update_yaxes(showgrid=False, secondary_y=True)
     return fig
+
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def flag_image(iso):
+    """Embed small flag assets so page rendering does not depend on a CDN request."""
+    country = pycountry.countries.get(alpha_3=iso)
+    code = 'eu' if iso == 'G163' else (country.alpha_2.lower() if country else '')
+    if not code:
+        return ''
+    try:
+        response = requests.get(f'https://flagcdn.com/w320/{code}.png', timeout=(3, 5))
+        response.raise_for_status()
+        return 'data:image/png;base64,' + base64.b64encode(response.content).decode('ascii')
+    except requests.RequestException:
+        return ''
+
+
+def visual_theme(one, two):
+    left, right = flag_image(one), flag_image(two)
+    st.markdown('''<style>
+    :root {color-scheme:light;}
+    [data-testid="stAppViewContainer"] {background:#f5f5f0;color:#172d32;}
+    [data-testid="stAppViewContainer"]::before,
+    [data-testid="stAppViewContainer"]::after {
+        content:"";position:fixed;width:58vw;height:74vh;top:0;pointer-events:none;
+        background-repeat:no-repeat;background-position:center;background-size:cover;
+        opacity:.095;filter:blur(8px);z-index:0;
+        mask-image:linear-gradient(to bottom,black,transparent 94%);
+        -webkit-mask-image:linear-gradient(to bottom,black,transparent 94%);
+    }
+    [data-testid="stAppViewContainer"]::before {left:-13vw;transform:rotate(-12deg);}
+    [data-testid="stAppViewContainer"]::after {right:-13vw;transform:rotate(12deg);}
+    [data-testid="stHeader"] {background:transparent;}
+    [data-testid="stMain"] {position:relative;z-index:1;}
+    .block-container {max-width:1160px;padding-top:3.3rem;padding-bottom:3rem;}
+    .rer-eyebrow {font-size:11px;font-weight:700;letter-spacing:.19em;color:#326c65;
+        text-transform:uppercase;margin-bottom:15px;}
+    .rer-hero h1 {font-size:clamp(38px,5.2vw,65px);font-weight:650;letter-spacing:-.055em;
+        line-height:1.05;color:#173b3a;padding:0;margin:0 0 18px;}
+    .rer-hero p {font-size:16px;line-height:1.65;color:#52696b;max-width:610px;margin:0;}
+    .rer-hero {padding:4px 0 28px;}
+    .rer-pair {display:grid;grid-template-columns:1fr 36px 1fr;align-items:center;gap:12px;
+        margin:12px 0 20px;}
+    .rer-country {display:flex;align-items:center;gap:14px;padding:19px 21px;
+        min-height:93px;background:rgba(255,255,255,.82);border:1px solid #dce5e0;
+        border-radius:18px;box-shadow:0 8px 28px #203c3510;}
+    .rer-flag {width:62px;height:42px;object-fit:cover;border-radius:7px;
+        box-shadow:0 2px 8px #173b3a18;flex-shrink:0;}
+    .rer-country small {display:block;text-transform:uppercase;font-size:10px;
+        letter-spacing:.13em;color:#728482;margin-bottom:5px;}
+    .rer-country strong {font-size:18px;font-weight:650;color:#173b3a;line-height:1.2;}
+    .rer-arrow {color:#66877e;text-align:center;font-size:24px;}
+    .rer-stat {background:rgba(255,255,255,.87);border:1px solid #dce5e0;
+        padding:18px 20px;border-radius:15px;margin:0 0 12px;min-height:94px;}
+    .rer-stat small {font-size:11px;color:#6d817c;letter-spacing:.055em;display:block;
+        margin-bottom:7px;}
+    .rer-stat strong {font-size:27px;color:#173b3a;font-weight:600;letter-spacing:-.035em;}
+    [data-testid="stMarkdownContainer"] p,[data-testid="stCaptionContainer"] p {
+        color:#4d6665;}
+    [data-testid="stWidgetLabel"] p {color:#234a46;font-weight:600;font-size:13px;}
+    div[data-baseweb="select"]>div {background:#ffffffed!important;color:#173b3a!important;
+        border-color:#d7e1db!important;border-radius:12px!important;}
+    input[role="combobox"] {color:#173b3a!important;}
+    [data-testid="stRadio"] label {background:#ffffffba;border:1px solid #dbe4df;
+        border-radius:999px;padding:7px 13px!important;}
+    [data-testid="stRadio"] label p {color:#214b45!important;}
+    [data-testid="stButton"] button {border-radius:10px;background:#ffffffb3;
+        border:1px solid #cbdad3;color:#326c65;font-size:12px;}
+    [data-testid="stDownloadButton"] button {background:#164f49!important;color:#fff!important;
+        border:0;border-radius:12px;padding:12px 22px;box-shadow:0 5px 15px #164f4920;}
+    [data-testid="stDownloadButton"] button p {color:white!important;}
+    [data-testid="stPlotlyChart"] {background:#ffffffed;border:1px solid #dce5e0;
+        border-radius:20px;overflow:hidden;padding:8px 4px;box-shadow:0 12px 40px #203c3507;}
+    [data-testid="stExpander"] {background:#ffffffc4;border-radius:14px;border-color:#dce5e0;}
+    [data-testid="stAlert"] {background:#e9f0e9;color:#33524c;border-radius:14px;}
+    [data-testid="stSlider"] [role="slider"] {background:#1b6c60!important;}
+    @media(max-width:700px) {
+        .block-container {padding-top:2.4rem;padding-left:1.1rem;padding-right:1.1rem;}
+        .rer-country {padding:13px 12px;gap:9px;border-radius:13px;min-height:86px;}
+        .rer-flag {width:42px;height:30px;}
+        .rer-country strong {font-size:14px;}
+        .rer-country small {font-size:9px;}
+        .rer-pair {gap:5px;grid-template-columns:1fr 22px 1fr;}
+        .rer-stat {padding:14px 12px;min-height:88px;}
+        .rer-stat strong {font-size:21px;}
+    }
+    </style>''' + f'''<style>
+    [data-testid="stAppViewContainer"]::before {{background-image:url("{left}");}}
+    [data-testid="stAppViewContainer"]::after {{background-image:url("{right}");}}
+    </style>''', unsafe_allow_html=True)
+    return left, right
+
+
+def pair_header(names, one, two, left, right):
+    def card(code, image, role):
+        flag = f'<img class="rer-flag" src="{image}" alt="{escape(names[code])} flag">' if image else ''
+        return f'<div class="rer-country">{flag}<div><small>{role} · {code}</small><strong>{escape(names[code])}</strong></div></div>'
+    return ('<div class="rer-pair">' + card(one, left, 'Country 1') +
+            '<div class="rer-arrow">↔</div>' + card(two, right, 'Country 2') + '</div>')
+
 
 
 def main():
     st.set_page_config(page_title='Real Exchange Rate Explorer', page_icon='🌐', layout='wide')
-    st.title('Real Exchange Rate Explorer')
-    st.write('Compare monthly prices and exchange rates using IMF data, from January 1976 where available.')
-    st.latex(r'S_t=FX_{2,t}/FX_{1,t},\quad RER_t=S_t P_{1,t}/P_{2,t},\quad RealIndex_t=100 RER_t/\overline{RER}')
+    hero = st.empty()
     try:
         names = countries()
         metadata_warning = None
@@ -138,6 +245,8 @@ def main():
     a, b = st.columns(2)
     one = a.selectbox('Country 1', codes, index=codes.index('GBR'), format_func=lambda x: f'{names[x]} ({x})')
     two = b.selectbox('Country 2', codes, index=codes.index('USA'), format_func=lambda x: f'{names[x]} ({x})')
+    left, right = visual_theme(one, two)
+    hero.markdown('<div class="rer-hero"><div class="rer-eyebrow">Currency explorer / IMF monthly data</div><h1>Real exchange rates.</h1><p>See how currencies and purchasing power move together. Choose two countries to explore their relationship over time.</p></div>' + pair_header(names, one, two, left, right), unsafe_allow_html=True)
     units = f'{names[two]} currency per 1 {names[one]} currency'
     if (one, two) == ('GBR', 'USA'):
         units = 'USD per GBP'
@@ -173,9 +282,9 @@ def main():
         st.warning('No overlapping CPI and FX observations in this period. Try another period or country pair.')
     else:
         a, b, c = st.columns(3)
-        a.write(f'Reference RER: **{data.rer_reference_mean.iloc[0]:.6g}**')
-        b.write(f'Mean real index: **{data.real_index.mean():.8f}**')
-        c.write(f'Valid months: **{count}**')
+        a.markdown(f'<div class="rer-stat"><small>REFERENCE RER</small><strong>{data.rer_reference_mean.iloc[0]:.5f}</strong></div>', unsafe_allow_html=True)
+        b.markdown(f'<div class="rer-stat"><small>MEAN REAL INDEX</small><strong>{data.real_index.mean():.2f}</strong></div>', unsafe_allow_html=True)
+        c.markdown(f'<div class="rer-stat"><small>MONTHS OF DATA</small><strong>{count}</strong></div>', unsafe_allow_html=True)
     st.plotly_chart(chart(data, mode, units), use_container_width=True)
     export = data.copy()
     export.insert(0, 'country2', two)
@@ -193,6 +302,9 @@ def main():
             st.write(f'{t:%Y-%m}: S = {row.fx2_lcu_per_usd:.10g} / {row.fx1_lcu_per_usd:.10g} = {row.nominal_s:.10g}. '
                      f'RER = {row.nominal_s:.10g} × {row.cpi1:.10g} / {row.cpi2:.10g} = {row.rer:.10g}. '
                      f'Real index = 100 × {row.rer:.10g} / {row.rer_reference_mean:.10g} = {row.real_index:.10g}.')
+    with st.expander('How to read the chart'):
+        st.latex(r'S_t=FX_{2,t}/FX_{1,t},\quad RER_t=S_t P_{1,t}/P_{2,t}')
+        st.latex(r'RealIndex_t=100 RER_t/\overline{RER}')
     st.info('An increase means Country 1 appreciates in real terms under this definition. '
             'The sample average is a reference, not an estimated equilibrium or proof of overvaluation. '
             'CPI base years affect raw RER levels but cancel in the real index. Currency reforms can break historical comparability; inspect IMF metadata before interpreting long histories.')
