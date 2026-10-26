@@ -31,13 +31,13 @@ def local(tag):
 @st.cache_data(ttl=86400, show_spinner=False)
 def countries():
     """Read the REF_AREA codelist referenced by the IMF CPI structure."""
-    response = get(f'{BASE}/structure/dataflow/IMF.STA/CPI/+',
+    response = get(f'{BASE}/structure/dataflow/IMF.STA/CPI',
                    'application/vnd.sdmx.structure+xml;version=2.1',
                    {'references': 'all'})
     root = ET.fromstring(response.content)
     refs = set()
     for dim in root.iter():
-        if local(dim.tag) == 'Dimension' and dim.get('id') == 'REF_AREA':
+        if local(dim.tag) == 'Dimension' and dim.get('id') in ('REF_AREA', 'COUNTRY'):
             for ref in dim.iter():
                 if local(ref.tag) == 'Ref' and ref.get('class') == 'Codelist':
                     refs.add(ref.get('id'))
@@ -63,7 +63,11 @@ def parse_csv(text):
     frame.columns = frame.columns.str.strip().str.upper()
     if not {'TIME_PERIOD', 'OBS_VALUE'}.issubset(frame.columns):
         raise ValueError('IMF response is not an observation CSV with TIME_PERIOD and OBS_VALUE.')
+    original_periods = frame.TIME_PERIOD.head(5).tolist()
+    frame['TIME_PERIOD'] = frame.TIME_PERIOD.str.replace(r'^(\d{4})-M(\d{2})$', r'\1-\2', regex=True).str.replace(r'^(\d{4}-\d{2})-01(?:T.*)?$', r'\1', regex=True)
     frame = frame[frame.TIME_PERIOD.str.fullmatch(r'\d{4}-\d{2}', na=False)].copy()
+    if frame.empty:
+        raise ValueError(f'No recognized monthly periods. IMF examples: {original_periods}; response: {text[:600]}')
     frame['month'] = pd.to_datetime(frame.TIME_PERIOD, format='%Y-%m')
     frame['value'] = pd.to_numeric(frame.OBS_VALUE, errors='coerce')
     # A series-specific multiplier, if supplied, scales the observation level.
