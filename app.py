@@ -187,8 +187,13 @@ def visual_theme(one, two):
     [data-testid="stWidgetLabel"] p {color:#234a46;font-weight:600;font-size:13px;}
     div[data-baseweb="select"]>div {background:#ffffffed!important;color:#173b3a!important;
         border-color:#d7e1db!important;border-radius:12px!important;}
-    input[role="combobox"] {color:#173b3a!important;}
-    [data-testid="stRadio"] label {background:#ffffffba;border:1px solid #dbe4df;
+    [data-testid="stSelectbox"] [role="group"] {background:#ffffffed!important;
+        border:1px solid #d7e1db!important;border-radius:12px!important;}
+    [data-testid="stSelectbox"] button {color:#173b3a!important;}
+    input[role="combobox"] {color:#173b3a!important;background:transparent!important;}
+    [role="listbox"] {background:#fff!important;color:#173b3a!important;}
+    [role="option"] {color:#173b3a!important;}
+    [data-testid="stRadio"] label:has(input) {background:#ffffffba;border:1px solid #dbe4df;
         border-radius:999px;padding:7px 13px!important;}
     [data-testid="stRadio"] label p {color:#214b45!important;}
     [data-testid="stButton"] button {border-radius:10px;background:#ffffffb3;
